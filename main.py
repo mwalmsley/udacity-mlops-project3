@@ -1,14 +1,34 @@
 import pickle
-# from dataclasses import dataclass, asdict
-import json
-
-import pandas as pd
-from fastapi import FastAPI
+import os
 from typing import Union
 
+import wandb
 from pydantic import BaseModel, Field
+import pandas as pd
+from fastapi import FastAPI
 
 from starter.ml import data
+
+
+
+# not an API call
+def load_artifacts(run):
+
+    # download from wandb
+
+    model_path = run.use_artifact('trained_census_model:latest').download('artifacts')
+    encoder_path = run.use_artifact('categorical_encoder:latest').download('artifacts')
+    label_binarizer_path = run.use_artifact('label_binarizer:latest').download('artifacts')
+
+    with open(model_path+'/model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    with open(encoder_path + '/encoder.pkl', 'rb') as f:
+        encoder = pickle.load(f)
+    with open(label_binarizer_path + '/label_binarizer.pkl', 'rb') as f:
+        lb = pickle.load(f)
+
+    return model, encoder, lb
+
 
 # using alias for hypens
 # https://github.com/pydantic/pydantic/issues/2266#issuecomment-760993721
@@ -55,6 +75,28 @@ class CensusRow(BaseModel):
 # Instantiate the app.
 app = FastAPI()
 
+CAT_FEATURES = [
+    "workclass",
+    "education",
+    "marital_status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "native_country",
+]
+# label = "salary"
+
+
+
+wandb.login(key=os.environ['WANDB_API_KEY'])
+run = wandb.init(
+    project='udacity-mlops-project3',
+    job_type='inference_server'
+)
+MODEL, ENCODER, LB = load_artifacts(run)
+
+
 # GET on the root giving a welcome message.
 @app.get("/")
 async def say_hello():
@@ -67,35 +109,18 @@ async def say_hello():
 async def run_mirror(row: CensusRow):
     return row
 
+# model etc. loaded on start and passed via closure
 @app.post("/inference/")
 async def run_inference(row: CensusRow):
     
     row_pd = pd.Series(data=dict(row))
     row_df = pd.DataFrame(data=[row_pd])  # one row df
 
-    cat_features = [
-        "workclass",
-        "education",
-        "marital_status",
-        "occupation",
-        "relationship",
-        "race",
-        "sex",
-        "native_country",
-    ]
-    # label = "salary"
 
-    with open('model/model.pkl', 'rb') as f:
-        model = pickle.load(f)
-    with open('model/encoder.pkl', 'rb') as f:
-        encoder = pickle.load(f)
-    with open('model/label_binarizer.pkl', 'rb') as f:
-        lb = pickle.load(f)
+    X, _, _, _ = data.process_data(row_df, encoder=ENCODER, categorical_features=CAT_FEATURES, training=False)
 
-    X, _, _, _ = data.process_data(row_df, encoder=encoder, categorical_features=cat_features, training=False)
+    y_pred = MODEL.predict(X)
 
-    y_pred = model.predict(X)
-
-    salary_pred = lb.inverse_transform(y_pred)[0]
+    salary_pred = LB.inverse_transform(y_pred)[0]
 
     return {'predicted_salary': salary_pred}
