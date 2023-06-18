@@ -1,29 +1,32 @@
+import pickle
+# from dataclasses import dataclass, asdict
+import json
+
+import pandas as pd
 from fastapi import FastAPI
 from typing import Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-# Declare the data object with its components and their type.
+from starter.ml import data
+
+# using alias for hypens
+# https://github.com/pydantic/pydantic/issues/2266#issuecomment-760993721
 class CensusRow(BaseModel):
     age: int
-    # workclass: str
-    # fnlgt: int
-    # education: str
-    # # todo hypen
-    # education_num: int
-    # # todo hypen
-    # marital_status: str
-    # occupation: str
-    # relationship: str
-    # race: str
-    # sex: str
-    # capital_gain: int
-    # # TODO hypen
-    # capital_loss: int
-    # # todo hypen
-    # hours_per_week: int
-    # # todo hypen
-    # native_country: str
+    workclass: str
+    fnlgt: int
+    education: str
+    education_num: int = Field(alias='education-num')
+    marital_status: str = Field(alias='marital-status')
+    occupation: str
+    relationship: str
+    race: str
+    sex: str
+    capital_gain: int = Field(alias='capital-gain')
+    capital_loss: int = Field(alias='capital-loss')
+    hours_per_week: int = Field(alias='hours-per-week')
+    native_country: str = Field(alias='native-country')
     # salary: str
 
     # https://fastapi.tiangolo.com/tutorial/schema-extra-example/#pydantic-schema_extra
@@ -43,8 +46,8 @@ class CensusRow(BaseModel):
                 "capital-gain": 2174,
                 "capital-loss": 0,
                 "hours-per-week": 40,
-                "native-country": "United-States",
-                "salary": "<=50K"
+                "native-country": "United-States"
+                # "salary": "<=50K"
             }
         }
 
@@ -66,4 +69,33 @@ async def run_mirror(row: CensusRow):
 
 @app.post("/inference/")
 async def run_inference(row: CensusRow):
-    return row.age > 30
+    
+    row_pd = pd.Series(data=dict(row))
+    row_df = pd.DataFrame(data=[row_pd])  # one row df
+
+    cat_features = [
+        "workclass",
+        "education",
+        "marital_status",
+        "occupation",
+        "relationship",
+        "race",
+        "sex",
+        "native_country",
+    ]
+    # label = "salary"
+
+    with open('model/model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    with open('model/encoder.pkl', 'rb') as f:
+        encoder = pickle.load(f)
+    with open('model/label_binarizer.pkl', 'rb') as f:
+        lb = pickle.load(f)
+
+    X, _, _, _ = data.process_data(row_df, encoder=encoder, categorical_features=cat_features, training=False)
+
+    y_pred = model.predict(X)
+
+    salary_pred = lb.inverse_transform(y_pred)[0]
+
+    return {'predicted_salary': salary_pred}

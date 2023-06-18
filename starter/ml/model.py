@@ -60,7 +60,7 @@ def inference(model: RandomForestClassifier, X):
     """
     return model.predict(X)
 
-def evaluate_model_on_slices(X, y, preds, save_loc='slice_output.txt'):
+def evaluate_model_on_slices(test_df, model, preprocess_func, save_loc='slice_output.txt'):
 
     """
     Write a script that runs this function
@@ -71,6 +71,7 @@ def evaluate_model_on_slices(X, y, preds, save_loc='slice_output.txt'):
     Output the printout to a file named slice_output.txt.
     """
 
+    # hardcode for now
     cat_features_to_slice = [
         "workclass",
         "education",
@@ -82,12 +83,16 @@ def evaluate_model_on_slices(X, y, preds, save_loc='slice_output.txt'):
         "native-country",
     ]
 
+    X, y = preprocess_func(test_df)
+    preds = model.predict(X)
+
     with open(save_loc, 'w+') as f:
 
         for cat_feature in cat_features_to_slice:
-            feature_slices = list(X[cat_feature].unique())
+            feature_slices = list(test_df[cat_feature].unique())
             for feature_slice in feature_slices:
-                row_mask = X[cat_feature] == feature_slice
+                row_mask = test_df[cat_feature] == feature_slice
+
                 y_slice, preds_slice = y[row_mask], preds[row_mask]
                 precision, recall, fbeta = compute_model_metrics(y_slice, preds_slice)
                 result_str = 'Slice: {} == {}. precision: {:.2f}, recall: {:.2f}, fbeta: {:.2f}'.format(

@@ -1,14 +1,12 @@
 # Script to train machine learning model.
-import os
-import shutil
+import pickle
 
 from sklearn.model_selection import train_test_split
 import pandas as pd
-import mlflow
 
 # Add the necessary imports for the starter code.
 from starter.ml.data import process_data
-from starter.ml.model import train_model, inference, evaluate_model_on_slices
+from starter.ml.model import train_model, inference, compute_model_metrics, evaluate_model_on_slices
 
 if __name__ == '__main__':
 
@@ -34,27 +32,33 @@ if __name__ == '__main__':
     # Optional enhancement, use K-fold cross validation instead of a train-test split.
     train, test = train_test_split(data, test_size=0.20)
 
-    X_train, y_train, encoder, lb = process_data(
+    X_train, y_train, encoder, label_binarizer = process_data(
         train, categorical_features=cat_features, label=label, training=True
     )
 
-    # Process the test data with the process_data function
-    X_test, y_test, encoder, lb = process_data(
-        test, categorical_features=cat_features, label=label, training=False, encoder=encoder
-    )
 
     # Train and save a model.
-    # TODO pipeline with encoder?
     model = train_model(X_train, y_train)
+    with open('model/model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+    with open('model/encoder.pkl', 'wb') as f:
+        pickle.dump(encoder, f)
+    # also saving lb to allow for inference to be converted back to str
+    with open('model/label_binarizer.pkl', 'wb') as f:
+        pickle.dump(label_binarizer, f)
 
-    # TODO save encoder
-    # https://mlflow.org/docs/latest/python_api/mlflow.sklearn.html#mlflow.sklearn.save_model
-    save_dir = 'model/latest/'
-    if os.path.isdir(save_dir):
-        shutil.rmtree(save_dir)
-
-    mlflow.sklearn.save_model(model, save_dir)
-
-    # new - evaluate on slices
+    # closure func. to repeat process_data with encoder/lb
+    # useful below, but mostly useful for evaluate_model_on_slices
+    def scoring_preprocess_func(df):
+        # convert clean data to numeric X, y. Also adjust labels.
+        X, y, _, _ = process_data(
+            df, categorical_features=cat_features, label=label, training=False, encoder=encoder, lb=label_binarizer
+        )
+        return X, y
+    X_test, y_test = scoring_preprocess_func(test)
     test_preds = inference(model, X_test)
-    evaluate_model_on_slices(X_test, y_test, test_preds)
+    precision, recall, fbeta = compute_model_metrics(y_test, test_preds)
+    result_str = 'Overall: precision: {:.2f}, recall: {:.2f}, fbeta: {:.2f}'.format(precision, recall, fbeta)
+    print(result_str)
+
+    evaluate_model_on_slices(test, model, scoring_preprocess_func)

@@ -23,8 +23,8 @@ def example():
         "capital-gain": 2174,
         "capital-loss": 0,
         "hours-per-week": 40,
-        "native-country": "United-States",
-        "salary": "<=50K"
+        "native-country": "United-States"
+        # "salary": "<=50K"
     }
 
 
@@ -49,4 +49,4 @@ def test_run_inference(example):
     # pydantic handles _ conversion automatically
     r = client.post("/inference/", data=json.dumps(example))
     assert r.status_code == 200
-    assert r.json() == True
+    assert r.json() == {'predicted_salary': '<=50K'}
