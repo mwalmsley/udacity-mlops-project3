@@ -9,6 +9,8 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.8"]
+    
+
 
     steps:
       - uses: actions/checkout@v3
@@ -32,3 +34,9 @@ jobs:
         run: |
           # do not run test_main_live.py, that checks the live service. circularity! 
           pytest test_main.py
+      - name: Deploy on render
+        env:
+          DEPLOY_HOOK_URL: ${{ vars.DEPLOY_HOOK_URL }}
+        run: |
+            python render_deploy_hook.py
+        
