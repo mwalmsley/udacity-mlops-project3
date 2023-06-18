@@ -28,7 +28,8 @@ if __name__ == '__main__':
     ]
     label = "salary"
 
-    data = df[cat_features + [label]]
+    # cat features + cont. features + label
+    data = df.copy()
 
     # Optional enhancement, use K-fold cross validation instead of a train-test split.
     train, test = train_test_split(data, test_size=0.20)

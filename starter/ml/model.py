@@ -89,7 +89,7 @@ def evaluate_model_on_slices(X, y, preds, save_loc='slice_output.txt'):
             for feature_slice in feature_slices:
                 row_mask = X[cat_feature] == feature_slice
                 y_slice, preds_slice = y[row_mask], preds[row_mask]
-                precision, recall, fbeta = compute_model_metrics(y, preds)
+                precision, recall, fbeta = compute_model_metrics(y_slice, preds_slice)
                 result_str = 'Slice: {} == {}. precision: {:.2f}, recall: {:.2f}, fbeta: {:.2f}'.format(
                     cat_feature, feature_slice, precision, recall, fbeta
                 )
