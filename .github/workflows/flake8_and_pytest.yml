@@ -30,4 +30,5 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Test with pytest
         run: |
-          pytest
+          # do not run test_main_live.py, that checks the live service. circularity! 
+          pytest test_main.py
