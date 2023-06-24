@@ -34,7 +34,7 @@ jobs:
         env: 
           WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
         run: |
-          # do not run test_main_live.py, that checks the live service. circularity! 
+          pytest test.py
           pytest test_main.py
       - name: Deploy on render
         env:
